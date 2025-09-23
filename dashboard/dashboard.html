@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="dashboard.css" />
+    <title>Dashboard Financeiro</title>
+  </head>
+  <body>
+    <div class="dashboard-container">
+      <header class="header">
+        <h1>💰 Dashboard Financeiro</h1>
+        <div class="user-info">
+          <div class="user-avatar" id="userAvatar">U</div>
+          <div>
+            <div style="font-weight: 600" id="userName">Usuário</div>
+            <div style="font-size: 0.8rem; color: #718096" id="userEmail">
+              user@email.com
+            </div>
+          </div>
+          <button class="logout-btn" onclick="logout()">Sair</button>
+        </div>
+      </header>
+
+      <!-- Cards de Estatísticas -->
+      <div class="stats-grid">
+        <div class="stat-card receivable">
+          <div class="stat-header">
+            <div class="stat-title">Contas a Receber</div>
+            <div class="stat-icon">💰</div>
+          </div>
+          <div class="stat-value" id="totalReceivable">R$ 0,00</div>
+          <div class="stat-change positive">
+            <span>↗️</span>
+            <span id="receivableChange">+0%</span>
+          </div>
+        </div>
+
+        <div class="stat-card payable">
+          <div class="stat-header">
+            <div class="stat-title">Contas a Pagar</div>
+            <div class="stat-icon">💸</div>
+          </div>
+          <div class="stat-value" id="totalPayable">R$ 0,00</div>
+          <div class="stat-change negative">
+            <span>↘️</span>
+            <span id="payableChange">+0%</span>
+          </div>
+        </div>
+
+        <div class="stat-card overdue">
+          <div class="stat-header">
+            <div class="stat-title">Em Atraso</div>
+            <div class="stat-icon">⚠️</div>
+          </div>
+          <div class="stat-value" id="totalOverdue">R$ 0,00</div>
+          <div class="stat-change negative">
+            <span>⚠️</span>
+            <span id="overdueCount">0 títulos</span>
+          </div>
+        </div>
+
+        <div class="stat-card balance">
+          <div class="stat-header">
+            <div class="stat-title">Saldo Líquido</div>
+            <div class="stat-icon">📊</div>
+          </div>
+          <div class="stat-value" id="netBalance">R$ 0,00</div>
+          <div class="stat-change" id="balanceChange">
+            <span>📈</span>
+            <span>Equilibrado</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filtros -->
+      <div class="filters-section">
+        <div class="filters-header">
+          <h3 class="filters-title">🔍 Filtros</h3>
+          <button class="clear-filters" onclick="clearFilters()">
+            Limpar Filtros
+          </button>
+        </div>
+        <div class="filters-grid">
+          <div class="filter-group">
+            <label class="filter-label">Tipo</label>
+            <select class="filter-select" id="filterType">
+              <option value="">Todos</option>
+              <option value="receber">Contas a Receber</option>
+              <option value="pagar">Contas a Pagar</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">Status</label>
+            <select class="filter-select" id="filterStatus">
+              <option value="">Todos</option>
+              <option value="pendente">Pendente</option>
+              <option value="pago">Pago</option>
+              <option value="vencido">Vencido</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">Parceiro</label>
+            <select class="filter-select" id="filterPartner">
+              <option value="">Todos</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">Documento</label>
+            <input
+              type="text"
+              class="filter-input"
+              id="filterDocument"
+              placeholder="Número do documento"
+            />
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">Vencimento (De)</label>
+            <input type="date" class="filter-input" id="filterDateFrom" />
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">Vencimento (Até)</label>
+            <input type="date" class="filter-input" id="filterDateTo" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabela -->
+      <div class="table-section">
+        <div class="table-header">
+          <h3 class="table-title">📋 Movimentações Financeiras</h3>
+          <button
+            class="add-record-btn"
+            style="
+              background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            "
+            onclick="openPartnerModal()"
+          >
+            👥 Novo Parceiro
+          </button>
+          <button class="add-record-btn" onclick="openModalMovement()">
+            ➕ Nova Movimentação
+          </button>
+        </div>
+        <div class="table-container">
+          <table class="financial-table">
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Documento</th>
+                <th>Parceiro</th>
+                <th>Tipo de Pagamento</th>
+                <th>Descrição</th>
+                <th>Valor</th>
+                <th>Vencimento</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="financialTableBody"></tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <div class="pagination-info" id="paginationInfo">
+            Mostrando 1-10 de 50 registros
+          </div>
+          <div class="pagination-controls">
+            <button
+              class="pagination-btn"
+              id="prevPage"
+              onclick="changePage(-1)"
+            >
+              ← Anterior
+            </button>
+            <span id="currentPage">Página 1</span>
+            <button
+              class="pagination-btn"
+              id="nextPage"
+              onclick="changePage(1)"
+            >
+              Próxima →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal para Nova/Editar Movimentação -->
+    <div class="modal" id="recordModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title" id="modalTitle">Nova Movimentação</h2>
+          <button class="close-modal" onclick="closeModalMovement()">
+            &times;
+          </button>
+        </div>
+        <form id="recordForm">
+          <div class="form-group">
+            <label class="form-label">Tipo</label>
+            <select class="form-input" id="recordType" required>
+              <option value="">Selecione...</option>
+              <option value="receber">Conta a Receber</option>
+              <option value="pagar">Conta a Pagar</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Número do Documento</label>
+            <input
+              type="text"
+              class="form-input"
+              id="recordDocument"
+              required
+              placeholder="Ex: 001234"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Parceiro</label>
+            <select class="form-input" id="recordPartner" required>
+              <option value="">Selecione um parceiro...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tipo de Pagamento</label>
+            <select class="form-input" id="recordPaymentType" required>
+              <option value="">Selecione o tipo de pagamento...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Descrição</label>
+            <input
+              type="text"
+              class="form-input"
+              id="recordDescription"
+              required
+              placeholder="Descrição da movimentação"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Valor (R$)</label>
+            <input
+              type="number"
+              class="form-input"
+              id="recordValue"
+              required
+              step="0.01"
+              placeholder="0,00"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Data de Vencimento</label>
+            <input type="date" class="form-input" id="recordDueDate" required />
+          </div>
+          <div class="form-actions">
+            <button
+              type="button"
+              class="btn-cancel"
+              onclick="closeModalMovement()"
+            >
+              Cancelar
+            </button>
+            <button type="submit" class="btn-save">Salvar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal" id="partnerModal">
+      <div class="modal-content" style="max-width: 600px">
+        <div class="modal-header">
+          <h2 class="modal-title" id="partnerModalTitle">🏢 Novo Parceiro</h2>
+          <button class="close-modal" onclick="closePartnerModal()">
+            &times;
+          </button>
+        </div>
+        <form id="partnerForm">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px">
+            <div class="form-group">
+              <label class="form-label">CNPJ/CPF *</label>
+              <input
+                type="text"
+                class="form-input"
+                id="partnerCgc"
+                required
+                placeholder="00.000.000/0000-00"
+                maxlength="18"
+              />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Celular *</label>
+              <input
+                type="text"
+                class="form-input"
+                id="partnerPhone"
+                required
+                placeholder="(11) 99999-9999"
+                maxlength="15"
+              />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Email *</label>
+            <input
+              type="email"
+              class="form-input"
+              id="partnerEmail"
+              required
+              placeholder="seu@email.com"
+            />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Razão Social *</label>
+            <input
+              type="text"
+              class="form-input"
+              id="partnerRazaoSocial"
+              required
+              placeholder="Razão social da empresa"
+            />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Nome Fantasia</label>
+            <input
+              type="text"
+              class="form-input"
+              id="partnerNomeFantasia"
+              placeholder="Nome fantasia (opcional)"
+            />
+          </div>
+
+          <div
+            style="display: grid; grid-template-columns: 1fr 150px; gap: 15px"
+          >
+            <div class="form-group">
+              <label class="form-label">CEP *</label>
+              <input
+                type="text"
+                class="form-input"
+                id="partnerCep"
+                required
+                placeholder="00000-000"
+                maxlength="9"
+                onblur="searchCep(this.value)"
+              />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Número *</label>
+              <input
+                type="text"
+                class="form-input"
+                id="partnerNumero"
+                required
+                placeholder="123"
+              />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Rua *</label>
+            <input
+              type="text"
+              class="form-input"
+              id="partnerRua"
+              required
+              placeholder="Nome da rua"
+            />
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px">
+            <div class="form-group">
+              <label class="form-label">Bairro *</label>
+              <input
+                type="text"
+                class="form-input"
+                id="partnerBairro"
+                required
+                placeholder="Nome do bairro"
+              />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Estado *</label>
+            <select class="form-input" id="partnerEstado" required>
+              <option value="">Selecione o estado...</option>
+              <option value="AC">Acre</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Cidade *</label>
+            <select class="form-input" id="partnerCidade" required>
+              <option value="">Selecione um estado primeiro...</option>
+            </select>
+          </div>
+
+          <div class="form-actions">
+            <button
+              type="button"
+              class="btn-cancel"
+              onclick="closePartnerModal()"
+            >
+              Cancelar
+            </button>
+            <button type="submit" class="btn-save">💾 Salvar Parceiro</button>
+            <button
+              type="button"
+              class="btn-delete-partner"
+              id="deletePartnerBtn"
+              style="display: none"
+              onclick="deleteCurrentPartner()"
+            >
+              🗑️ Excluir Parceiro
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="dashboardScript.js"></script>
+    <script src="partnerScript.js"></script>
+    <script src="newMovementScript.js"></script>
+  </body>
+</html>
