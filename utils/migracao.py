@@ -3,8 +3,6 @@ import requests
 import psycopg2
 import sys
 
-# --- INFORMAÇÕES DE CONEXÃO COM O BANCO DE DADOS ---
-# Substitua com suas credenciais do Aiven
 DB_HOST = os.getenv("DB_HOST")
 DB_PORT = os.getenv("DB_PORT")
 DB_NAME = os.getenv("DB_NAME")
@@ -19,12 +17,12 @@ def baixar_dados_json():
     try:
         print("Baixando dados do JSON...")
         response = requests.get(JSON_URL)
-        response.raise_for_status()  # Lança um erro para respostas ruins (4xx ou 5xx)
+        response.raise_for_status() 
         print("Download completo.")
         return response.json()
     except requests.exceptions.RequestException as e:
         print(f"Erro ao baixar o JSON: {e}")
-        sys.exit(1) # Encerra o script se não conseguir baixar os dados
+        sys.exit(1)
 
 def conectar_banco():
     """Cria e retorna uma conexão com o banco de dados PostgreSQL."""
@@ -44,7 +42,7 @@ def conectar_banco():
     except psycopg2.OperationalError as e:
         print(f"Erro ao conectar ao banco de dados: {e}")
         print("\nVerifique se as credenciais (host, porta, usuário, senha) estão corretas.")
-        sys.exit(1) # Encerra o script se a conexão falhar
+        sys.exit(1)
 
 def inserir_dados(conn, cursor, data):
     """Insere os dados dos estados e cidades na tabela existente cidadeEstado."""
@@ -71,20 +69,17 @@ def main():
     """Função principal que orquestra todo o processo."""
     dados = baixar_dados_json()
     
-    conn = None # Inicia a variável de conexão como nula
+    conn = None 
     try:
         conn = conectar_banco()
-        # O cursor é usado para executar comandos SQL
         with conn.cursor() as cursor:
             inserir_dados(conn, cursor, dados)
             
     finally:
-        # Garante que a conexão seja fechada, mesmo se ocorrer um erro
         if conn is not None:
             conn.close()
             print("Conexão com o banco de dados foi fechada.")
 
-# Ponto de entrada do script
 if __name__ == "__main__":
     main()
 
