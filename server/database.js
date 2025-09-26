@@ -1,5 +1,3 @@
-require("dotenv").config();
-
 const { Pool } = require("pg");
 const bcrypt = require("bcrypt");
 
