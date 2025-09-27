@@ -6,6 +6,11 @@ let filteredRecords = [];
 let currentPage = 1;
 const recordsPerPage = 10;
 
+// Variáveis para controle da migração
+let selectedMigration = "complete";
+let migrationInProgress = false;
+let migrationInterval = null;
+
 // Inicialização
 document.addEventListener("DOMContentLoaded", async function () {
   const tbody = document.getElementById("financialTableBody");
@@ -21,6 +26,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   setDefaultDates();
   loadPartnerFilterOptions();
   setupFormMasks();
+  setupMigrationModal(); // Adicionar configuração do modal
 
   // Força o carregamento das opções do modal após os dados serem carregados
   setTimeout(() => {
@@ -32,6 +38,61 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
   }, 100);
 });
+
+// Função para configurar o modal de migração
+function setupMigrationModal() {
+  const migrationOptions = document.querySelectorAll(".migration-option");
+  migrationOptions.forEach((option) => {
+    option.addEventListener("click", function () {
+      migrationOptions.forEach((opt) => opt.classList.remove("active"));
+      this.classList.add("active");
+      selectedMigration = this.dataset.migration;
+      addLogEntry(
+        `📌 Selecionado: ${this.querySelector("h4").textContent}`,
+        "info"
+      );
+    });
+  });
+
+  // Fechar modal ao clicar fora dele
+  const migrationModal = document.getElementById("migrationModal");
+  if (migrationModal) {
+    migrationModal.addEventListener("click", function (event) {
+      if (event.target === migrationModal) {
+        closeMigrationModal();
+      }
+    });
+  }
+}
+
+// Função para abrir o modal de migração
+function openMigrationModal() {
+  console.log("Tentando abrir modal de migração...");
+  const modal = document.getElementById("migrationModal");
+  if (modal) {
+    modal.classList.add("show");
+    clearLog();
+    addLogEntry(
+      "📋 Modal de migração aberto. Selecione o tipo de migração desejado.",
+      "info"
+    );
+    console.log("Modal de migração aberto com sucesso");
+  } else {
+    console.error("Modal de migração não encontrado!");
+  }
+}
+
+// Função para fechar o modal de migração
+function closeMigrationModal() {
+  if (migrationInProgress) {
+    if (confirm("Uma migração está em andamento. Deseja realmente fechar?")) {
+      stopMigration();
+      document.getElementById("migrationModal").classList.remove("show");
+    }
+  } else {
+    document.getElementById("migrationModal").classList.remove("show");
+  }
+}
 
 // Função para buscar os dados iniciais da API
 async function loadInitialData() {
@@ -258,22 +319,27 @@ function setupFilters() {
   ];
 
   filters.forEach((filterId) => {
-    document.getElementById(filterId).addEventListener("input", applyFilters);
+    const element = document.getElementById(filterId);
+    if (element) {
+      element.addEventListener("input", applyFilters);
+    }
   });
 }
 
 // Responsável por carregar os parceiros no novo dropdown de filtro.
 function loadPartnerFilterOptions() {
   const select = document.getElementById("filterPartner");
-  select.innerHTML = '<option value="">Todos</option>';
+  if (select) {
+    select.innerHTML = '<option value="">Todos</option>';
 
-  // Pega a lista de parceiros já carregada e cria as opções
-  partners.forEach((partner) => {
-    const option = document.createElement("option");
-    option.value = partner.razaoSocial;
-    option.textContent = partner.razaoSocial;
-    select.appendChild(option);
-  });
+    // Pega a lista de parceiros já carregada e cria as opções
+    partners.forEach((partner) => {
+      const option = document.createElement("option");
+      option.value = partner.razaoSocial;
+      option.textContent = partner.razaoSocial;
+      select.appendChild(option);
+    });
+  }
 }
 
 // Aplicar filtros
@@ -454,6 +520,7 @@ async function markCancelPayment(id) {
   };
   await updatePaymentStatus(id, config);
 }
+
 // Editar registro - INTEGRADA COM API /api/financeiro-records/:id (PUT)
 async function editRecord(id) {
   const record = financialRecords.find((r) => r.id === id);
@@ -587,6 +654,12 @@ function getStatusText(status) {
   return statusMap[status] || status;
 }
 
+// Função placeholder para setupFormMasks
+function setupFormMasks() {
+  console.log("Setup de máscaras executado");
+}
+
 console.log("💼 Dashboard Financeiro carregado");
 console.log("📊 Total de registros:", financialRecords.length);
 console.log("👥 Total de parceiros:", partners.length);
+console.log("✅ Modal de migração configurado e pronto para uso!");

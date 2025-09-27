@@ -10,6 +10,11 @@
     <div class="dashboard-container">
       <header class="header">
         <h1>💰 Dashboard Financeiro</h1>
+
+        <button class="migration-btn" onclick="openMigrationModal()">
+          🔄 Migração de Dados
+        </button>
+
         <div class="user-info">
           <div class="user-avatar" id="userAvatar">U</div>
           <div>
@@ -180,6 +185,89 @@
             >
               Próxima →
             </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="migration-modal" id="migrationModal">
+      <div class="migration-modal-content">
+        <div class="migration-modal-header">
+          <h2 class="migration-modal-title">🔄 Migração de Dados</h2>
+          <button class="migration-close" onclick="closeMigrationModal()">
+            &times;
+          </button>
+        </div>
+
+        <div class="migration-modal-body">
+          <div class="migration-options">
+            <div class="migration-option active" data-migration="complete">
+              <h4>🚀 Migração Completa</h4>
+              <p>
+                Migra todos os dados: usuários, cidades, clientes, centros de
+                custo, plano de contas e tipos de pagamento
+              </p>
+            </div>
+
+            <div class="migration-option" data-migration="users">
+              <h4>👥 Apenas Usuários</h4>
+              <p>Migra somente os dados de usuários</p>
+            </div>
+
+            <div class="migration-option" data-migration="cidadeEstado">
+              <h4>🏙️ Cidades e Estados</h4>
+              <p>Migra dados de cidades e estados</p>
+            </div>
+
+            <div class="migration-option" data-migration="cliFornec">
+              <h4>🏢 Clientes e Fornecedores</h4>
+              <p>Migra dados de clientes e fornecedores</p>
+            </div>
+
+            <div class="migration-option" data-migration="centroCusto">
+              <h4>💰 Centros de Custo</h4>
+              <p>Migra dados de centros de custo</p>
+            </div>
+
+            <div class="migration-option" data-migration="planoContas">
+              <h4>📋 Plano de Contas</h4>
+              <p>Migra dados do plano de contas</p>
+            </div>
+
+            <div class="migration-option" data-migration="tipoPag">
+              <h4>💳 Tipos de Pagamento</h4>
+              <p>Migra dados de tipos de pagamento</p>
+            </div>
+          </div>
+
+          <div class="migration-controls">
+            <button
+              class="migration-action-btn"
+              id="startMigrationBtn"
+              onclick="startMigration()"
+            >
+              <span class="spinner" style="display: none"></span>
+              🚀 Iniciar Migração
+            </button>
+            <button
+              class="migration-action-btn stop-btn"
+              id="stopMigrationBtn"
+              onclick="stopMigration()"
+              style="display: none"
+            >
+              ⛔ Parar Migração
+            </button>
+          </div>
+
+          <div class="migration-status" id="migrationStatus">
+            <h4 style="margin-top: 0; color: #2d3748">📊 Resumo da Migração</h4>
+            <div id="statusContent"></div>
+          </div>
+
+          <div class="migration-log" id="migrationLog">
+            <div class="log-entry info">
+              📋 Selecione o tipo de migração e clique em "Iniciar Migração"
+            </div>
           </div>
         </div>
       </div>
@@ -422,5 +510,6 @@
     <script src="dashboardScript.js"></script>
     <script src="partnerScript.js"></script>
     <script src="newMovementScript.js"></script>
+    <script src="migrationScript.js"></script>
   </body>
 </html>

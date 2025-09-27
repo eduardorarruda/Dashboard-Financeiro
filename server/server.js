@@ -4,6 +4,7 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const { Database } = require("./database");
+const { MigrationMain } = require("./migration/migrationService.js");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -345,6 +346,114 @@ app.put("/api/partners/:id", async (req, res) => {
   }
 });
 
+//Rota para Migração
+app.post("/api/migration/execute", async (req, res) => {
+  if (process.env.NODE_ENV !== "development") {
+    return res.status(403).json({
+      success: false,
+      message:
+        "Esta operação é permitida apenas em ambiente de desenvolvimento.",
+    });
+  }
+
+  const { migrationType } = req.body;
+
+  console.log(`📥 Recebida solicitação de migração: ${migrationType}`);
+
+  try {
+    let result;
+
+    // Validate migration type
+    const validMigrationTypes = [
+      "complete",
+      "users",
+      "cidadeEstado",
+      "cliFornec",
+      "centroCusto",
+      "planoContas",
+      "tipoPag",
+    ];
+
+    if (!migrationType || !validMigrationTypes.includes(migrationType)) {
+      return res.status(400).json({
+        success: false,
+        message: `Tipo de migração inválido. Tipos válidos: ${validMigrationTypes.join(
+          ", "
+        )}`,
+      });
+    }
+
+    console.log(`🚀 Iniciando migração do tipo: ${migrationType}`);
+
+    switch (migrationType) {
+      case "complete":
+        result = await MigrationMain.executeMigration();
+        break;
+      case "users":
+        result = await MigrationMain.executeUserMigration();
+        break;
+      case "cidadeEstado":
+        result = await MigrationMain.executeCidadeEstadoMigration();
+        break;
+      case "cliFornec":
+        result = await MigrationMain.executeCliFornecMigration();
+        break;
+      case "centroCusto":
+        result = await MigrationMain.executeCentroCustoMigration();
+        break;
+      case "planoContas":
+        result = await MigrationMain.executePlanoContasMigration();
+        break;
+      case "tipoPag":
+        result = await MigrationMain.executeTipoPagMigration();
+        break;
+      default:
+        throw new Error("Tipo de migração inválido");
+    }
+
+    console.log(
+      `✅ Migração ${migrationType} finalizada:`,
+      result.success ? "SUCESSO" : "ERRO"
+    );
+
+    if (result.success) {
+      res.status(200).json(result);
+    } else {
+      res.status(500).json(result);
+    }
+  } catch (error) {
+    console.error(`❌ Erro crítico na migração ${migrationType}:`, error);
+
+    res.status(500).json({
+      success: false,
+      message: `Erro durante a migração: ${error.message}`,
+      error: error.message,
+      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+//teste migração
+app.get("/api/migration/test", async (req, res) => {
+  try {
+    const { Database } = require("./migration/migrationDatabase");
+    const testResult = await Database.testConnections();
+    res.json({
+      success: true,
+      message: "Migration database connections working",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Migration connection test failed:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      details: process.env.NODE_ENV === "development" ? error.stack : undefined,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
 // Rota para verificar saúde da API
 app.get("/api/health", (req, res) => {
   res.json({

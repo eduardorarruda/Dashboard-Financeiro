@@ -110,7 +110,7 @@ class Database {
       }
 
       // Hash da senha
-      const saltRounds = 12;
+      const saltRounds = 10;
       const hashedPassword = await bcrypt.hash(password, saltRounds);
 
       // Inserir usuário
@@ -157,7 +157,7 @@ class Database {
 
       if (password) {
         paramCount++;
-        const hashedPassword = await bcrypt.hash(password, 12);
+        const hashedPassword = await bcrypt.hash(password, 10);
         query += `, senha = $${paramCount}`;
         values.push(hashedPassword);
       }
