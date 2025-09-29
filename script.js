@@ -92,7 +92,8 @@ async function apiRequest(endpoint, options = {}) {
 // Função para realizar login real
 async function performLogin(email, password) {
   try {
-    const result = await apiRequest("/login", {
+    // CORRIGIDO: Removido o "/api" do início
+    const result = await apiRequest("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     });
@@ -106,7 +107,9 @@ async function performLogin(email, password) {
 // Função para salvar dados do usuário no localStorage
 function saveUserData(userData) {
   try {
-    localStorage.setItem("currentUser", JSON.stringify(userData));
+    // CORREÇÃO: Salvar o objeto user e o token
+    localStorage.setItem("currentUser", JSON.stringify(userData.user));
+    localStorage.setItem("authToken", userData.token); // Salvar o token
     sessionStorage.setItem("isLoggedIn", "true");
   } catch (error) {
     console.warn("⚠️ Não foi possível salvar dados do usuário:", error);
@@ -138,10 +141,11 @@ loginForm.addEventListener("submit", async function (e) {
     const result = await performLogin(email, password);
 
     if (result.success) {
-      saveUserData(result.user);
+      // CORREÇÃO: Passar o objeto 'result' inteiro que contém user e token
+      saveUserData(result.data);
 
       showSuccess(
-        `Login realizado com sucesso! Bem-vindo, ${result.user.name}!`
+        `Login realizado com sucesso! Bem-vindo, ${result.data.user.name}!`
       );
 
       // Limpar formulário
@@ -165,7 +169,7 @@ loginForm.addEventListener("submit", async function (e) {
 // Função para registrar novo usuário
 async function registerUser(name, email, password) {
   try {
-    const result = await apiRequest("/register", {
+    const result = await apiRequest("/auth/register", {
       method: "POST",
       body: JSON.stringify({ name, email, password }),
     });

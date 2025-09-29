@@ -97,15 +97,14 @@ function closeMigrationModal() {
 // Função para buscar os dados iniciais da API
 async function loadInitialData() {
   try {
-    // adiciona a busca de cidadeEstado ao Promise.all
+    // CORREÇÃO: Ajuste nas URLs das APIs para buscar os dados corretamente.
     const [recordsResponse, partnersResponse, cidadeEstadoResponse] =
       await Promise.all([
-        fetch("http://localhost:3000/api/financeiro-records"),
+        fetch("http://localhost:3000/api/financial"), // URL correta para registros financeiros
         fetch("http://localhost:3000/api/partners"),
-        fetch("http://localhost:3000/api/cidadeEstado"),
+        fetch("http://localhost:3000/api/partners/cidade-estado"), // URL correta para cidades/estados
       ]);
 
-    // verifica a resposta de cidadeEstadoResponse
     if (
       !recordsResponse.ok ||
       !partnersResponse.ok ||
@@ -116,33 +115,34 @@ async function loadInitialData() {
 
     const recordsData = await recordsResponse.json();
     const partnersData = await partnersResponse.json();
-    const cidadeEstadoData = await cidadeEstadoResponse.json(); // processa o JSON da nova API
+    const cidadeEstadoData = await cidadeEstadoResponse.json();
 
-    // armazena os dados na variável global
-    CidadeEstadoRecords = cidadeEstadoData.records;
+    CidadeEstadoRecords = cidadeEstadoData.data.records; // A API retorna os dados dentro de 'data'
 
-    // Mapeia e transforma os dados do banco para o formato que o frontend espera
-    partners = partnersData.partners.map((p) => ({
+    // CORREÇÃO: Mapeamento completo dos dados dos parceiros.
+    partners = partnersData.data.partners.map((p) => ({
       id: p.id,
       cgc: p.cgc,
       razaoSocial: p.razaosocial,
       nomeFantasia: p.nomefantasia,
       celular: p.numerocel,
+      email: p.email, // Adicionado email
       numero: p.numeroend,
       cep: p.cep,
       rua: p.rua,
       bairro: p.bairro,
-      cidade: "",
-      estado: "",
+      cidade: "", // Será populado depois se necessário
+      estado: "", // Será populado depois se necessário
     }));
 
-    financialRecords = recordsData.records.map((r) => ({
+    // CORREÇÃO: Mapeamento correto dos dados financeiros.
+    financialRecords = recordsData.data.records.map((r) => ({
       id: r.id,
-      type: r.tipo.trim() === "P" ? "pagar" : "receber",
+      type: r.tipo.trim() === "D" ? "pagar" : "receber", // 'D' é Despesa (pagar), 'R' é Receita (receber)
       document: r.numero,
       partner: r.parceiro_nome,
       paymentType: r.idtipopag,
-      description: "Descrição Padrão",
+      description: r.descricao, // Usar a descrição vinda da API
       value: parseFloat(r.valor),
       dueDate: new Date(r.datavencimento).toISOString().split("T")[0],
       status: r.situacao.trim() === "A" ? "pendente" : "pago",
@@ -195,6 +195,7 @@ function updateStats() {
 
   const overdue = financialRecords.filter((r) => {
     const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalizar para o início do dia
     const dueDate = new Date(r.dueDate);
     return dueDate < today && r.status === "pendente";
   });
@@ -213,7 +214,6 @@ function updateStats() {
     "overdueCount"
   ).textContent = `${overdue.length} títulos`;
 
-  // Atualizar classes do saldo
   const balanceElement = document.getElementById("netBalance");
   const balanceChange = document.getElementById("balanceChange");
   if (netBalance > 0) {
@@ -237,11 +237,19 @@ function renderTable() {
 
   tbody.innerHTML = "";
 
+  if (pageRecords.length === 0) {
+    tbody.innerHTML =
+      '<tr><td colspan="9" style="text-align:center;">Nenhum registro encontrado.</td></tr>';
+    updatePagination();
+    return;
+  }
+
   pageRecords.forEach((record) => {
     const tr = document.createElement("tr");
 
     // Determinar status de vencimento
     const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalizar para o início do dia
     const dueDate = new Date(record.dueDate);
     let status = record.status;
     if (status === "pendente" && dueDate < today) {
@@ -254,7 +262,7 @@ function renderTable() {
                     ${record.type === "receber" ? "Receber" : "Pagar"}
                 </span>
             </td>
-            <td><strong>${record.document}</strong></td>
+            <td><strong>${record.document || "N/A"}</strong></td>
             <td>${record.partner}</td>
             <td>${
               typeof getPaymentTypeName === "function"
@@ -284,7 +292,7 @@ function renderTable() {
                 ${
                   status === "pago"
                     ? `<button class="action-btn payCancel-btn" onclick="markCancelPayment(${record.id})">
-                        ❌ Cancelar Pagamento
+                        ❌ Cancelar
                     </button>`
                     : ""
                 }
@@ -384,6 +392,7 @@ function applyFilters() {
       // Determinar status real considerando vencimento
       let recordStatus = record.status;
       const today = new Date();
+      today.setHours(0, 0, 0, 0); // Normalizar
       const dueDate = new Date(record.dueDate);
       if (recordStatus === "pendente" && dueDate < today) {
         recordStatus = "vencido";
@@ -394,7 +403,8 @@ function applyFilters() {
         (!status || recordStatus === status) &&
         (!partner || record.partner === partner) &&
         (!documentValue ||
-          record.document.toLowerCase().includes(documentValue)) &&
+          (record.document &&
+            record.document.toLowerCase().includes(documentValue))) &&
         (!dateFrom || record.dueDate >= dateFrom) &&
         (!dateTo || record.dueDate <= dateTo)
       );
@@ -416,8 +426,7 @@ function clearFilters() {
   document.getElementById("filterStatus").value = "";
   document.getElementById("filterPartner").value = "";
   document.getElementById("filterDocument").value = "";
-  document.getElementById("filterDateFrom").value = "";
-  document.getElementById("filterDateTo").value = "";
+  setDefaultDates(); // Volta para as datas padrão
 
   filteredRecords = [...financialRecords];
   currentPage = 1;
@@ -435,12 +444,10 @@ function setDefaultDates() {
 }
 
 async function updatePaymentStatus(id, config) {
-  // 1. Pede a confirmação do usuário com uma mensagem customizada
   if (!confirm(config.confirmMessage)) {
     return;
   }
 
-  // Seleciona o botão correto usando o nome da função original
   const actionButtons = document.querySelectorAll(
     `[onclick*="${config.originalFunction}(${id})"]`
   );
@@ -450,34 +457,34 @@ async function updatePaymentStatus(id, config) {
   });
 
   try {
-    const response = await fetch(`http://localhost:3000/api/pagemento/${id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      // 2. Usa o status da API ( 'A' ou 'P' ) vindo da configuração
-      body: JSON.stringify({ situacao: config.apiStatus }),
-    });
+    // CORREÇÃO: URL correta para atualizar o status do pagamento.
+    const response = await fetch(
+      `http://localhost:3000/api/financial/${id}/payment-status`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          // CORREÇÃO: Adicionar token de autenticação
+          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+        },
+        body: JSON.stringify({ situacao: config.apiStatus }),
+      }
+    );
 
     const result = await response.json();
 
     if (result.success) {
-      // Função auxiliar para atualizar o status em um array
       const updateRecordStatus = (record) => {
         if (record.id === id) {
-          // 3. Usa o status local ('pago' ou 'pendente') vindo da configuração
           record.status = config.localStatus;
         }
       };
 
-      // Atualiza o status nos dois arrays
       financialRecords.forEach(updateRecordStatus);
       filteredRecords.forEach(updateRecordStatus);
 
-      // Atualiza a interface
       updateStats();
       renderTable();
-      // 4. Mostra uma mensagem de sucesso customizada
       alert(config.successMessage);
     } else {
       throw new Error(result.message || `Erro ao ${config.actionDescription}`);
@@ -485,12 +492,8 @@ async function updatePaymentStatus(id, config) {
   } catch (error) {
     console.error(`Erro ao ${config.actionDescription}:`, error);
     alert(`Erro ao ${config.actionDescription}: ${error.message}`);
-  } finally {
-    // 5. Restaura o botão com o HTML original
-    actionButtons.forEach((btn) => {
-      btn.disabled = false;
-      btn.innerHTML = config.buttonRestoreHTML;
-    });
+    // Recarrega a tabela para reverter a mudança visual do botão em caso de erro
+    renderTable();
   }
 }
 
@@ -501,13 +504,11 @@ async function markAsPaid(id) {
     localStatus: "pago",
     successMessage: "Movimentação marcada como paga com sucesso!",
     actionDescription: "marcar como pago",
-    buttonRestoreHTML: "💰 Pagar",
     originalFunction: "markAsPaid",
   };
   await updatePaymentStatus(id, config);
 }
 
-// Substitua a sua função markCancelPayment original por esta:
 async function markCancelPayment(id) {
   const config = {
     confirmMessage: "Cancelar o pagamento desta movimentação?",
@@ -515,21 +516,18 @@ async function markCancelPayment(id) {
     localStatus: "pendente",
     successMessage: "Pagamento cancelado com sucesso!",
     actionDescription: "cancelar pagamento",
-    buttonRestoreHTML: "❌ Cancelar Pagamento",
     originalFunction: "markCancelPayment",
   };
   await updatePaymentStatus(id, config);
 }
 
-// Editar registro - INTEGRADA COM API /api/financeiro-records/:id (PUT)
-async function editRecord(id) {
+// Editar registro
+function editRecord(id) {
   const record = financialRecords.find((r) => r.id === id);
   if (!record) {
     alert("Registro não encontrado!");
     return;
   }
-
-  // Abrir modal de edição
   openModalMovement(id);
 }
 
@@ -550,7 +548,6 @@ async function deleteRecord(id) {
   }
 
   try {
-    // Mostrar loading
     const deleteButtons = document.querySelectorAll(
       `[onclick*="deleteRecord(${id})"]`
     );
@@ -559,22 +556,21 @@ async function deleteRecord(id) {
       btn.textContent = "Excluindo...";
     });
 
-    // Fazer requisição para a API de exclusão
-    const response = await fetch(
-      `http://localhost:3000/api/financeiro-records-delete/${id}`,
-      {
-        method: "DELETE",
-      }
-    );
+    // CORREÇÃO: URL correta para deletar um registro financeiro.
+    const response = await fetch(`http://localhost:3000/api/financial/${id}`, {
+      method: "DELETE",
+      headers: {
+        // CORREÇÃO: Adicionar token de autenticação
+        Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+      },
+    });
 
     const result = await response.json();
 
     if (result.success) {
-      // Remover da lista local
       financialRecords = financialRecords.filter((r) => r.id !== id);
       filteredRecords = filteredRecords.filter((r) => r.id !== id);
 
-      // Atualizar UI
       updateStats();
       renderTable();
       alert("Movimentação excluída com sucesso!");
@@ -584,15 +580,7 @@ async function deleteRecord(id) {
   } catch (error) {
     console.error("Erro ao deletar movimentação:", error);
     alert("Erro ao excluir movimentação: " + error.message);
-  } finally {
-    // Restaurar botões
-    const deleteButtons = document.querySelectorAll(
-      `[onclick*="deleteRecord(${id})"]`
-    );
-    deleteButtons.forEach((btn) => {
-      btn.disabled = false;
-      btn.innerHTML = "🗑️ Excluir";
-    });
+    renderTable(); // Restaura o botão
   }
 }
 
@@ -603,16 +591,21 @@ function updatePagination() {
   const startIndex = (currentPage - 1) * recordsPerPage + 1;
   const endIndex = Math.min(currentPage * recordsPerPage, totalRecords);
 
-  document.getElementById(
-    "paginationInfo"
-  ).textContent = `Mostrando ${startIndex}-${endIndex} de ${totalRecords} registros`;
-
-  document.getElementById(
-    "currentPage"
-  ).textContent = `Página ${currentPage} de ${totalPages}`;
+  if (totalRecords === 0) {
+    document.getElementById("paginationInfo").textContent = "Nenhum registro";
+    document.getElementById("currentPage").textContent = "Página 0 de 0";
+  } else {
+    document.getElementById(
+      "paginationInfo"
+    ).textContent = `Mostrando ${startIndex}-${endIndex} de ${totalRecords} registros`;
+    document.getElementById(
+      "currentPage"
+    ).textContent = `Página ${currentPage} de ${totalPages}`;
+  }
 
   document.getElementById("prevPage").disabled = currentPage === 1;
-  document.getElementById("nextPage").disabled = currentPage === totalPages;
+  document.getElementById("nextPage").disabled =
+    currentPage === totalPages || totalPages === 0;
 }
 
 // Mudar página
@@ -638,7 +631,8 @@ function formatCurrency(value) {
 
 function formatDate(dateString) {
   const date = new Date(dateString);
-  return date.toLocaleDateString("pt-BR");
+  const timeZoneOffset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() + timeZoneOffset).toLocaleDateString("pt-BR");
 }
 
 function formatDateInput(date) {
@@ -654,12 +648,8 @@ function getStatusText(status) {
   return statusMap[status] || status;
 }
 
-// Função placeholder para setupFormMasks
 function setupFormMasks() {
   console.log("Setup de máscaras executado");
 }
 
 console.log("💼 Dashboard Financeiro carregado");
-console.log("📊 Total de registros:", financialRecords.length);
-console.log("👥 Total de parceiros:", partners.length);
-console.log("✅ Modal de migração configurado e pronto para uso!");

@@ -12,13 +12,15 @@ async function startMigration() {
   );
 
   try {
-    // Simular chamada para o backend
+    // A chamada para o backend já está correta.
     const response = await fetch(
       "http://localhost:3000/api/migration/execute",
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          // CORREÇÃO: Adicionado token para o caso de a rota ser protegida no futuro.
+          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
         },
         body: JSON.stringify({
           migrationType: selectedMigration,
@@ -26,11 +28,25 @@ async function startMigration() {
       }
     );
 
-    // Como a API pode não existir, vamos simular a migração
-    simulateMigrationLogs();
+    const result = await response.json();
+
+    if (response.ok && result.success) {
+      // Se a chamada à API for real e bem sucedida, você pode processar os resultados aqui
+      // Por enquanto, vamos manter a simulação para fins visuais.
+      addLogEntry(
+        "✅ Requisição de migração enviada com sucesso ao servidor.",
+        "success"
+      );
+      simulateMigrationLogs(); // Mantendo a simulação para feedback visual
+    } else {
+      throw new Error(result.message || "API retornou um erro.");
+    }
   } catch (error) {
-    addLogEntry(`❌ Simulando migração (API não disponível)`, "warning");
-    // Continuar com simulação mesmo se a API não existir
+    addLogEntry(
+      `❌ Erro ao contatar API: ${error.message}. Iniciando simulação local.`,
+      "warning"
+    );
+    // Continuar com simulação mesmo se a API não existir ou falhar
     simulateMigrationLogs();
   }
 }
