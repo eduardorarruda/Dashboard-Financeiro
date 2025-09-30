@@ -47,7 +47,6 @@ function closeModalMovement() {
 // Carregar tipos de pagamento da API
 async function loadPaymentTypes() {
   try {
-    // CORREÇÃO: URL correta para buscar os tipos de pagamento.
     const response = await fetch(
       "http://localhost:3000/api/financial/tipo-pagamento",
       {

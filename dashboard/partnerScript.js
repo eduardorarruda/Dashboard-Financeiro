@@ -45,12 +45,10 @@ async function searchPartnerByCgc(cgc) {
   if (cleanCgc.length < 11) return;
 
   try {
-    // CORREÇÃO: URL correta para buscar parceiro por CGC.
     const response = await fetch(
       `http://localhost:3000/api/partners/cgc/${cleanCgc}`,
       {
         headers: {
-          // CORREÇÃO: Adicionar token de autenticação
           Authorization: `Bearer ${localStorage.getItem("authToken")}`,
         },
       }

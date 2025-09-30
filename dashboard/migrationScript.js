@@ -12,14 +12,12 @@ async function startMigration() {
   );
 
   try {
-    // A chamada para o backend já está correta.
     const response = await fetch(
       "http://localhost:3000/api/migration/execute",
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          // CORREÇÃO: Adicionado token para o caso de a rota ser protegida no futuro.
           Authorization: `Bearer ${localStorage.getItem("authToken")}`,
         },
         body: JSON.stringify({

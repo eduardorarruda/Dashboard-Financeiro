@@ -97,12 +97,17 @@ function closeMigrationModal() {
 // Função para buscar os dados iniciais da API
 async function loadInitialData() {
   try {
-    // CORREÇÃO: Ajuste nas URLs das APIs para buscar os dados corretamente.
+    // CORREÇÃO: Adicionado o header de autenticação em todas as requisições
+    const headers = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+    };
+
     const [recordsResponse, partnersResponse, cidadeEstadoResponse] =
       await Promise.all([
-        fetch("http://localhost:3000/api/financial"), // URL correta para registros financeiros
-        fetch("http://localhost:3000/api/partners"),
-        fetch("http://localhost:3000/api/partners/cidade-estado"), // URL correta para cidades/estados
+        fetch("http://localhost:3000/api/financial", { headers }),
+        fetch("http://localhost:3000/api/partners", { headers }),
+        fetch("http://localhost:3000/api/partners/cidade-estado", { headers }),
       ]);
 
     if (
@@ -457,14 +462,12 @@ async function updatePaymentStatus(id, config) {
   });
 
   try {
-    // CORREÇÃO: URL correta para atualizar o status do pagamento.
     const response = await fetch(
       `http://localhost:3000/api/financial/${id}/payment-status`,
       {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          // CORREÇÃO: Adicionar token de autenticação
           Authorization: `Bearer ${localStorage.getItem("authToken")}`,
         },
         body: JSON.stringify({ situacao: config.apiStatus }),
@@ -556,11 +559,9 @@ async function deleteRecord(id) {
       btn.textContent = "Excluindo...";
     });
 
-    // CORREÇÃO: URL correta para deletar um registro financeiro.
     const response = await fetch(`http://localhost:3000/api/financial/${id}`, {
       method: "DELETE",
       headers: {
-        // CORREÇÃO: Adicionar token de autenticação
         Authorization: `Bearer ${localStorage.getItem("authToken")}`,
       },
     });
