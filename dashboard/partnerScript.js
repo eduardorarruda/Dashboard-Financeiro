@@ -46,12 +46,17 @@ async function searchPartnerByCgc(cgc) {
 
   try {
     const response = await fetch(
-      `http://localhost:3000/api/getPartners/${cleanCgc}`
+      `http://localhost:3000/api/partners/cgc/${cleanCgc}`,
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+        },
+      }
     );
     if (response.ok) {
       const data = await response.json();
-      if (data.success && data.partner) {
-        const partner = data.partner;
+      if (data.success && data.data.partner) {
+        const partner = data.data.partner;
 
         document.getElementById("partnerRazaoSocial").value =
           partner.razaosocial || "";
@@ -175,10 +180,11 @@ function getCidadeEstadoId(cidade, estado) {
 
 // Configurar máscaras nos campos
 function setupFormMasks() {
-  // Máscara para CNPJ/CPF com busca automática
   const cgcField = document.getElementById("partnerCgc");
   cgcField.addEventListener("input", function (e) {
     let value = e.target.value.replace(/\D/g, "");
+    if (value.length > 14) value = value.slice(0, 14);
+
     if (value.length <= 11) {
       // CPF
       value = value.replace(/(\d{3})(\d)/, "$1.$2");
@@ -194,7 +200,6 @@ function setupFormMasks() {
     e.target.value = value;
   });
 
-  // Buscar parceiro quando o CGC estiver completo
   cgcField.addEventListener("blur", async function (e) {
     const cgc = e.target.value.replace(/\D/g, "");
     if (cgc.length === 11 || cgc.length === 14) {
@@ -204,19 +209,21 @@ function setupFormMasks() {
           "ℹ️ CGC não encontrado. Você pode cadastrar um novo parceiro.",
           "info"
         );
-        // Se não encontrou, garantir que o botão de excluir esteja escondido
         document.getElementById("deletePartnerBtn").style.display = "none";
       }
     }
   });
-}
-document.getElementById("partnerPhone").addEventListener("input", function (e) {
-  e.target.value = formatPhone(e.target.value);
-});
 
-document.getElementById("partnerCep").addEventListener("input", function (e) {
-  e.target.value = formatCep(e.target.value);
-});
+  document
+    .getElementById("partnerPhone")
+    .addEventListener("input", function (e) {
+      e.target.value = formatPhone(e.target.value);
+    });
+
+  document.getElementById("partnerCep").addEventListener("input", function (e) {
+    e.target.value = formatCep(e.target.value);
+  });
+}
 
 // Abrir modal do parceiro
 function openPartnerModal(partnerId = null) {
@@ -251,7 +258,6 @@ function openPartnerModal(partnerId = null) {
   });
 
   if (partnerId) {
-    // Editando parceiro existente da lista local
     title.textContent = "✏️ Editar Parceiro";
     const partner = partners.find((p) => p.id === partnerId);
     if (partner) {
@@ -338,11 +344,9 @@ document
       let url;
 
       if (editingPartnerId) {
-        // Editar parceiro existente
         method = "PUT";
         url = `http://localhost:3000/api/partners/${editingPartnerId}`;
       } else {
-        // Criar novo parceiro
         method = "POST";
         url = "http://localhost:3000/api/partners";
       }
@@ -351,6 +355,7 @@ document
         method: method,
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
         },
         body: JSON.stringify(partnerData),
       });
@@ -358,55 +363,12 @@ document
       const result = await response.json();
 
       if (result.success) {
-        if (editingPartnerId) {
-          // Atualizar parceiro na lista local
-          const index = partners.findIndex((p) => p.id === editingPartnerId);
-          if (index !== -1) {
-            const oldRazaoSocial = partners[index].razaoSocial;
-            partners[index] = {
-              id: editingPartnerId,
-              cgc: result.partner.cgc,
-              razaoSocial: result.partner.razaosocial,
-              nomeFantasia: result.partner.nomefantasia,
-              celular: result.partner.numerocel,
-              numero: result.partner.numeroend,
-              cep: result.partner.cep,
-              rua: result.partner.rua,
-              bairro: result.partner.bairro,
-              cidade: cidade,
-              estado: estado,
-            };
+        alert(result.message || "Operação realizada com sucesso!");
 
-            // Atualizar registros financeiros que usam este parceiro
-            financialRecords.forEach((record) => {
-              if (record.partner === oldRazaoSocial) {
-                record.partner = result.partner.razaosocial;
-              }
-            });
-          }
-          alert("Parceiro atualizado com sucesso!");
-        } else {
-          // Adicionar novo parceiro à lista local
-          const newPartner = {
-            id: result.partner.id,
-            cgc: result.partner.cgc,
-            razaoSocial: result.partner.razaosocial,
-            nomeFantasia: result.partner.nomefantasia,
-            celular: result.partner.numerocel,
-            numero: result.partner.numeroend,
-            cep: result.partner.cep,
-            rua: result.partner.rua,
-            bairro: result.partner.bairro,
-            cidade: cidade,
-            estado: estado,
-          };
-          partners.push(newPartner);
-          alert("Parceiro cadastrado com sucesso!");
-        }
-
+        // Recarregar todos os dados para garantir consistência
+        await loadInitialData();
+        refreshUI();
         closePartnerModal();
-        loadPartnerOptions();
-        renderTable();
       } else {
         showPartnerMessage(
           `❌ ${result.message || "Erro ao salvar parceiro"}`,
@@ -424,11 +386,12 @@ function refreshUI() {
     if (typeof loadPartnerOptions === "function") {
       loadPartnerOptions();
     }
-
+    if (typeof loadPartnerFilterOptions === "function") {
+      loadPartnerFilterOptions();
+    }
     if (typeof updateStats === "function") {
       updateStats();
     }
-
     if (typeof financialRecords !== "undefined") {
       filteredRecords = [...financialRecords];
       currentPage = 1;
@@ -480,44 +443,22 @@ async function deleteCurrentPartner() {
       `http://localhost:3000/api/partners/${editingPartnerId}`,
       {
         method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+        },
       }
     );
 
     const result = await response.json();
 
     if (result.success) {
-      partners = partners.filter((p) => p.id !== editingPartnerId);
-
-      const affectedRecords = financialRecords.filter(
-        (r) => r.partner === partnerToDelete.razaoSocial
-      );
-
-      if (affectedRecords.length > 0) {
-        const removeRecords = confirm(
-          `Este parceiro possui ${affectedRecords.length} movimentação(ões) financeira(s) associada(s).\n\nDeseja também remover essas movimentações?`
-        );
-
-        if (removeRecords) {
-          financialRecords = financialRecords.filter(
-            (r) => r.partner !== partnerToDelete.razaoSocial
-          );
-          filteredRecords = filteredRecords.filter(
-            (r) => r.partner !== partnerToDelete.razaoSocial
-          );
-        } else {
-          alert(
-            "Parceiro excluído, mas as movimentações financeiras foram mantidas."
-          );
-        }
-      }
-
       alert(result.message || "Parceiro excluído com sucesso!");
 
       closePartnerModal();
 
-      setTimeout(() => {
-        refreshUI();
-      }, 100);
+      // Recarrega todos os dados para refletir a exclusão
+      await loadInitialData();
+      refreshUI();
     } else {
       alert(`Erro ao excluir: ${result.message}`);
     }
@@ -525,16 +466,12 @@ async function deleteCurrentPartner() {
     console.error("Erro ao deletar parceiro:", error);
     alert("Erro de conexão ao tentar excluir o parceiro. Tente novamente.");
   } finally {
-    try {
-      if (deleteButton && deleteButton.parentNode) {
-        deleteButton.disabled = false;
-        deleteButton.innerHTML = originalDeleteText;
-      }
-      if (saveButton && saveButton.parentNode) {
-        saveButton.disabled = false;
-      }
-    } catch (finallyError) {
-      console.error("Erro ao reabilitar botões:", finallyError);
+    if (deleteButton) {
+      deleteButton.disabled = false;
+      deleteButton.innerHTML = originalDeleteText;
+    }
+    if (saveButton) {
+      saveButton.disabled = false;
     }
   }
 }
