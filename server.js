@@ -16,16 +16,6 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
 
-// Servir dashboard.html
-app.get("/dashboard", (req, res) => {
-  res.sendFile(path.join(__dirname, "dashboard", "dashboard.html"));
-});
-
-// Servir dashboard.html quando acessar o arquivo direto
-app.get("/dashboard/dashboard.html", (req, res) => {
-  res.sendFile(path.join(__dirname, "dashboard", "dashboard.html"));
-});
-
 // Health check
 app.get("/api/health", (req, res) => {
   res.json({
@@ -36,19 +26,21 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// Fallback para SPA - servir index.html para qualquer rota não encontrada
-app.use((req, res) => {
-  if (!req.path.includes(".")) {
-    res.sendFile(path.join(__dirname, "index.html"));
-  } else {
-    res.status(404).json({ error: "Arquivo não encontrado" });
-  }
-});
-
-// Error handling
+// Middleware para tratamento de erros (deve vir antes do fallback)
 app.use((err, req, res, next) => {
   console.error("❌ Erro:", err);
   res.status(500).json({ error: "Erro interno do servidor" });
+});
+
+// Fallback para SPA - servir index.html para rotas não-API
+app.use((req, res) => {
+  // Não servir index.html para rotas de API ou arquivos com extensão
+  if (req.path.startsWith("/api") || req.path.includes(".")) {
+    return res.status(404).json({ error: "Arquivo ou rota não encontrada" });
+  }
+
+  // Servir index.html para SPA routing
+  res.sendFile(path.join(__dirname, "index.html"));
 });
 
 // Iniciar servidor

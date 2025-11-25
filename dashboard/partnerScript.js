@@ -1,5 +1,10 @@
 let editingPartnerId = null;
 
+const API_REST =
+  window.API_REST ||
+  window.API_BASE_URL + "/api" ||
+  "http://localhost:3000/api";
+
 // Carregar opções de parceiros no select
 function loadPartnerOptions() {
   const select = document.getElementById("recordPartner");
@@ -45,14 +50,11 @@ async function searchPartnerByCgc(cgc) {
   if (cleanCgc.length < 11) return;
 
   try {
-    const response = await fetch(
-      `http://localhost:3000/api/partners/cgc/${cleanCgc}`,
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-        },
-      }
-    );
+    const response = await fetch(`${API_REST}/partners/cgc/${cleanCgc}`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+      },
+    });
     if (response.ok) {
       const data = await response.json();
       if (data.success && data.data.partner) {
@@ -345,10 +347,10 @@ document
 
       if (editingPartnerId) {
         method = "PUT";
-        url = `http://localhost:3000/api/partners/${editingPartnerId}`;
+        url = `${API_REST}/partners/${editingPartnerId}`;
       } else {
         method = "POST";
-        url = "http://localhost:3000/api/partners";
+        url = `${API_REST}/partners`;
       }
 
       response = await fetch(url, {
@@ -439,15 +441,12 @@ async function deleteCurrentPartner() {
   deleteButton.innerHTML = "🗑️ Excluindo...";
 
   try {
-    const response = await fetch(
-      `http://localhost:3000/api/partners/${editingPartnerId}`,
-      {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-        },
-      }
-    );
+    const response = await fetch(`${API_REST}/partners/${editingPartnerId}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+      },
+    });
 
     const result = await response.json();
 
