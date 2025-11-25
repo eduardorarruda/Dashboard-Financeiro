@@ -225,6 +225,20 @@ body {
   overflow-y: auto;
   white-space: pre-wrap;
   border: 2px solid #2d3748;
+  position: relative;
+}
+
+.migration-log.loading::after {
+  content: "";
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  width: 20px;
+  height: 20px;
+  border: 3px solid #4a5568;
+  border-top-color: #63b3ed;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
 
 .migration-log::-webkit-scrollbar {

@@ -11,6 +11,12 @@ let selectedMigration = "complete";
 let migrationInProgress = false;
 let migrationInterval = null;
 
+// URL da API centralizada
+const API_BASE_URL =
+  window.API_REST ||
+  window.API_BASE_URL + "/api" ||
+  "http://localhost:3000/api";
+
 // Inicialização
 document.addEventListener("DOMContentLoaded", async function () {
   const tbody = document.getElementById("financialTableBody");
@@ -105,9 +111,9 @@ async function loadInitialData() {
 
     const [recordsResponse, partnersResponse, cidadeEstadoResponse] =
       await Promise.all([
-        fetch("http://localhost:3000/api/financial", { headers }),
-        fetch("http://localhost:3000/api/partners", { headers }),
-        fetch("http://localhost:3000/api/partners/cidade-estado", { headers }),
+        fetch(`${API_BASE_URL}/financial`, { headers }),
+        fetch(`${API_BASE_URL}/partners`, { headers }),
+        fetch(`${API_BASE_URL}/partners/cidade-estado`, { headers }),
       ]);
 
     if (
@@ -463,7 +469,7 @@ async function updatePaymentStatus(id, config) {
 
   try {
     const response = await fetch(
-      `http://localhost:3000/api/financial/${id}/payment-status`,
+      `${API_BASE_URL}/financial/${id}/payment-status`,
       {
         method: "PUT",
         headers: {
@@ -559,7 +565,7 @@ async function deleteRecord(id) {
       btn.textContent = "Excluindo...";
     });
 
-    const response = await fetch(`http://localhost:3000/api/financial/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/financial/${id}`, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${localStorage.getItem("authToken")}`,

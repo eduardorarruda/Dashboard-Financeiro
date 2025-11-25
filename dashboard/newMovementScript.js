@@ -1,6 +1,11 @@
 let editingId = null;
 let paymentTypes = [];
 
+const API_REST =
+  window.API_REST ||
+  window.API_BASE_URL + "/api" ||
+  "http://localhost:3000/api";
+
 // Abrir modal de movimentação
 function openModalMovement(recordId = null) {
   editingId = recordId;
@@ -47,14 +52,11 @@ function closeModalMovement() {
 // Carregar tipos de pagamento da API
 async function loadPaymentTypes() {
   try {
-    const response = await fetch(
-      "http://localhost:3000/api/financial/tipo-pagamento",
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-        },
-      }
-    );
+    const response = await fetch(`${API_REST}/financial/tipo-pagamento`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+      },
+    });
     if (!response.ok) {
       throw new Error("Falha ao carregar tipos de pagamento");
     }
@@ -122,9 +124,7 @@ async function saveOrUpdateMovement(movementData, id = null) {
 
     // CORREÇÃO: URLs dinâmicas para criar (POST) ou editar (PUT).
     const method = id ? "PUT" : "POST";
-    const url = id
-      ? `http://localhost:3000/api/financial/${id}`
-      : "http://localhost:3000/api/financial";
+    const url = id ? `${API_REST}/financial/${id}` : `${API_REST}/financial`;
 
     console.log(`Enviando dados para ${url}:`, apiData);
 

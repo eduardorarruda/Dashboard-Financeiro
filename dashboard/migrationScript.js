@@ -1,3 +1,8 @@
+const API_REST =
+  window.API_REST ||
+  window.API_BASE_URL + "/api" ||
+  "http://localhost:3000/api";
+
 async function startMigration() {
   if (migrationInProgress) return;
 
@@ -11,74 +16,153 @@ async function startMigration() {
     "info"
   );
 
+  const logContainer = document.getElementById("migrationLog");
+  if (logContainer) {
+    logContainer.classList.add("loading");
+  }
+
   try {
-    const response = await fetch(
-      "http://localhost:3000/api/migration/execute",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-        },
-        body: JSON.stringify({
-          migrationType: selectedMigration,
-        }),
-      }
-    );
+    const response = await fetch(`${API_REST}/migration/execute`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+      },
+      body: JSON.stringify({
+        migrationType: selectedMigration,
+      }),
+    });
 
     const result = await response.json();
 
+    if (logContainer) {
+      logContainer.classList.remove("loading");
+    }
+
     if (response.ok && result.success) {
-      // Se a chamada à API for real e bem sucedida, você pode processar os resultados aqui
-      // Por enquanto, vamos manter a simulação para fins visuais.
       addLogEntry(
         "✅ Requisição de migração enviada com sucesso ao servidor.",
         "success"
       );
-      simulateMigrationLogs(); // Mantendo a simulação para feedback visual
+
+      // Processar logs reais da API
+      if (result.data && result.data.logs && result.data.logs.length > 0) {
+        addLogEntry("📊 PROCESSANDO LOGS DA MIGRAÇÃO...", "info");
+
+        // Processar e exibir os logs exatamente como a API retornou.
+        const logs = Array.isArray(result.data.logs)
+          ? result.data.logs.slice().sort((a, b) => {
+              // Ordena por timestamp se existir
+              const ta = a.timestamp ? Date.parse(a.timestamp) : 0;
+              const tb = b.timestamp ? Date.parse(b.timestamp) : 0;
+              return ta - tb;
+            })
+          : [];
+
+        let delay = 0;
+        logs.forEach((log) => {
+          delay += 150; // 150ms entre entradas para efeito de streaming
+          setTimeout(() => {
+            if (!migrationInProgress) return;
+
+            // Mapear tipos retornados pela API para classes visuais
+            const typeMap = {
+              log: "info",
+              info: "info",
+              warning: "warning",
+              warn: "warning",
+              error: "error",
+              success: "success",
+            };
+
+            const visualType = typeMap[log.type] || "info";
+
+            // Usar timestamp retornado pela API quando disponível
+            addLogEntry(log.message || String(log), visualType, log.timestamp);
+
+            // Se o log trouxer um objeto de status, atualizamos o painel
+            if (log.status && typeof log.status === "object") {
+              updateMigrationStatus(log.status);
+            }
+          }, delay);
+        });
+
+        // Após exibir todos os logs, mostrar o resumo vindo da API (se houver)
+        const totalDelay = delay + 300;
+        setTimeout(() => {
+          if (!migrationInProgress) return;
+
+          // A API pode retornar `data.summary` ou campos como successCount/errorCount
+          if (result.data.summary) {
+            displayMigrationSummary(result.data.summary);
+          } else {
+            // Construir um resumo simples a partir dos campos conhecidos
+            const built = {};
+            if (typeof result.data.successCount === "number")
+              built.successCount = result.data.successCount;
+            if (typeof result.data.errorCount === "number")
+              built.errorCount = result.data.errorCount;
+            if (result.data.migrationType)
+              built.migrationType = result.data.migrationType;
+            if (result.data.timestamp) built.timestamp = result.data.timestamp;
+
+            if (Object.keys(built).length > 0) {
+              displayMigrationSummary(built);
+            }
+          }
+
+          completeMigration();
+        }, totalDelay);
+      } else {
+        // Não utilizar simulação local — informar erro e encerrar a migração
+        addLogEntry(
+          "❌ Nenhum log retornado pela API. Verifique o servidor e tente novamente.",
+          "error"
+        );
+        // Encerrar o processo de migração em estado de falha
+        failMigration("Nenhum log retornado pela API.");
+        return;
+      }
     } else {
       throw new Error(result.message || "API retornou um erro.");
     }
   } catch (error) {
+    if (logContainer) {
+      logContainer.classList.remove("loading");
+    }
+
+    console.error("Erro na migração:", error);
+    addLogEntry(`❌ Erro ao contatar API: ${error.message}`, "error");
     addLogEntry(
-      `❌ Erro ao contatar API: ${error.message}. Iniciando simulação local.`,
+      "⚠️ A migração foi interrompida devido a falha na API.",
       "warning"
     );
-    // Continuar com simulação mesmo se a API não existir ou falhar
-    simulateMigrationLogs();
+    // Encerrar em falha
+    failMigration(error.message || "Erro desconhecido ao contatar API.");
   }
 }
 
-// Função para simular logs de migração em tempo real
-function simulateMigrationLogs() {
-  const logs = getMigrationLogsForType(selectedMigration);
-  let logIndex = 0;
+// Função para encerrar a migração em estado de falha
+function failMigration(reason) {
+  // Limpar interval com segurança
+  if (migrationInterval !== null && migrationInterval !== undefined) {
+    clearInterval(migrationInterval);
+    migrationInterval = null;
+  }
 
-  migrationInterval = setInterval(() => {
-    if (logIndex < logs.length && migrationInProgress) {
-      const log = logs[logIndex];
-      addLogEntry(log.message, log.type);
-
-      if (log.status) {
-        updateMigrationStatus(log.status);
-      }
-
-      logIndex++;
-    } else {
-      // Migração concluída
-      clearInterval(migrationInterval);
-      if (migrationInProgress) {
-        completeMigration();
-      }
-    }
-  }, 800);
+  migrationInProgress = false;
+  updateMigrationUI(false);
+  addLogEntry(`❌ MIGRAÇÃO FINALIZADA COM ERRO: ${reason}`, "error");
 }
 
 // Função para parar a migração
 function stopMigration() {
-  if (migrationInterval) {
+  // Limpar interval com segurança
+  if (migrationInterval !== null && migrationInterval !== undefined) {
     clearInterval(migrationInterval);
+    migrationInterval = null;
   }
+
   migrationInProgress = false;
   updateMigrationUI(false);
   addLogEntry("⛔ MIGRAÇÃO INTERROMPIDA PELO USUÁRIO", "warning");
@@ -114,21 +198,35 @@ function updateMigrationUI(isRunning) {
 }
 
 // Função para adicionar entrada no log
-function addLogEntry(message, type = "info") {
-  const logContainer = document.getElementById("migrationLog");
-  if (!logContainer) {
-    console.error("Container de log não encontrado!");
-    return;
+function addLogEntry(message, type = "info", isoTimestamp) {
+  try {
+    const logContainer = document.getElementById("migrationLog");
+    if (!logContainer) {
+      console.warn("Container de log não encontrado! Mensagem:", message);
+      return;
+    }
+
+    const logEntry = document.createElement("div");
+    logEntry.className = `log-entry ${type}`;
+
+    let timestamp = new Date();
+    if (isoTimestamp) {
+      const parsed = Date.parse(isoTimestamp);
+      if (!isNaN(parsed)) timestamp = new Date(parsed);
+    }
+
+    const timeStr = timestamp.toLocaleTimeString("pt-BR");
+    logEntry.textContent = `[${timeStr}] ${message}`;
+
+    logContainer.appendChild(logEntry);
+
+    // Scroll seguro
+    if (logContainer.scrollHeight) {
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
+  } catch (err) {
+    console.error("Erro ao adicionar log entry:", err);
   }
-
-  const logEntry = document.createElement("div");
-  logEntry.className = `log-entry ${type}`;
-
-  const timestamp = new Date().toLocaleTimeString("pt-BR");
-  logEntry.textContent = `[${timestamp}] ${message}`;
-
-  logContainer.appendChild(logEntry);
-  logContainer.scrollTop = logContainer.scrollHeight;
 }
 
 // Função para limpar o log
@@ -196,156 +294,72 @@ function getMigrationTypeName(type) {
     centroCusto: "💰 Centros de Custo",
     planoContas: "📋 Plano de Contas",
     tipoPag: "💳 Tipos de Pagamento",
+    financeiro: "💸 Registros Financeiros",
   };
   return names[type] || type;
 }
 
-// Função para obter logs simulados baseados no tipo de migração
-function getMigrationLogsForType(type) {
-  const baseLogs = [
-    { message: "🔧 Inicializando conexão com banco de dados...", type: "info" },
-    { message: "✅ Conexão estabelecida com sucesso", type: "success" },
-    { message: "📋 Validando estrutura de dados...", type: "info" },
-  ];
+// Função para exibir resumo da migração
+function displayMigrationSummary(summary) {
+  const statusContainer = document.getElementById("migrationStatus");
+  const statusContent = document.getElementById("statusContent");
 
-  const migrationSpecificLogs = {
-    complete: [
-      ...baseLogs,
-      {
-        message: "🏙️ Iniciando migração de cidades e estados...",
-        type: "info",
-      },
-      {
-        message: "✅ Cidades e estados migrados: 27 registros",
-        type: "success",
-      },
-      { message: "👥 Iniciando migração de usuários...", type: "info" },
-      { message: "✅ Usuários migrados: 15 registros", type: "success" },
-      {
-        message: "🏢 Iniciando migração de clientes e fornecedores...",
-        type: "info",
-      },
-      {
-        message: "✅ Clientes/fornecedores migrados: 128 registros",
-        type: "success",
-      },
-      { message: "💰 Iniciando migração de centros de custo...", type: "info" },
-      { message: "✅ Centros de custo migrados: 8 registros", type: "success" },
-      { message: "📋 Iniciando migração de plano de contas...", type: "info" },
-      { message: "✅ Plano de contas migrado: 45 registros", type: "success" },
-      {
-        message: "💳 Iniciando migração de tipos de pagamento...",
-        type: "info",
-      },
-      {
-        message: "✅ Tipos de pagamento migrados: 12 registros",
-        type: "success",
-      },
-      {
-        message: "📊 Gerando resumo final...",
-        type: "info",
-        status: {
-          cidadeEstado: { successCount: 27, errorCount: 0 },
-          users: { successCount: 15, errorCount: 0 },
-          cliFornec: { successCount: 128, errorCount: 0 },
-          centroCusto: { successCount: 8, errorCount: 0 },
-          planoContas: { successCount: 45, errorCount: 0 },
-          tipoPag: { successCount: 12, errorCount: 0 },
-        },
-      },
-    ],
-    users: [
-      ...baseLogs,
-      { message: "👥 Iniciando migração de usuários...", type: "info" },
-      { message: "🔍 Processando usuário: admin@empresa.com", type: "info" },
-      { message: "🔍 Processando usuário: operador@empresa.com", type: "info" },
-      {
-        message: "✅ Usuários migrados com sucesso: 15 registros",
-        type: "success",
-      },
-      {
-        message: "📊 Resumo da migração de usuários",
-        type: "success",
-        status: { users: { successCount: 15, errorCount: 0 } },
-      },
-    ],
-    cidadeEstado: [
-      ...baseLogs,
-      {
-        message: "🏙️ Iniciando migração de cidades e estados...",
-        type: "info",
-      },
-      { message: "🔍 Processando estados brasileiros...", type: "info" },
-      { message: "🏙️ Processando cidades por estado...", type: "info" },
-      { message: "✅ Estados migrados: 27 registros", type: "success" },
-      { message: "✅ Cidades migradas: 5.570 registros", type: "success" },
-      {
-        message: "📊 Resumo da migração",
-        type: "success",
-        status: { cidadeEstado: { successCount: 5597, errorCount: 0 } },
-      },
-    ],
-    cliFornec: [
-      ...baseLogs,
-      {
-        message: "🏢 Iniciando migração de clientes e fornecedores...",
-        type: "info",
-      },
-      { message: "🔍 Processando clientes...", type: "info" },
-      { message: "🔍 Processando fornecedores...", type: "info" },
-      {
-        message: "✅ Clientes e fornecedores migrados: 128 registros",
-        type: "success",
-      },
-      {
-        message: "📊 Resumo da migração",
-        type: "success",
-        status: { cliFornec: { successCount: 128, errorCount: 0 } },
-      },
-    ],
-    centroCusto: [
-      ...baseLogs,
-      { message: "💰 Iniciando migração de centros de custo...", type: "info" },
-      { message: "🔍 Processando centros de custo...", type: "info" },
-      {
-        message: "✅ Centros de custo migrados: 8 registros",
-        type: "success",
-      },
-      {
-        message: "📊 Resumo da migração",
-        type: "success",
-        status: { centroCusto: { successCount: 8, errorCount: 0 } },
-      },
-    ],
-    planoContas: [
-      ...baseLogs,
-      { message: "📋 Iniciando migração de plano de contas...", type: "info" },
-      { message: "🔍 Processando contas contábeis...", type: "info" },
-      { message: "✅ Plano de contas migrado: 45 registros", type: "success" },
-      {
-        message: "📊 Resumo da migração",
-        type: "success",
-        status: { planoContas: { successCount: 45, errorCount: 0 } },
-      },
-    ],
-    tipoPag: [
-      ...baseLogs,
-      {
-        message: "💳 Iniciando migração de tipos de pagamento...",
-        type: "info",
-      },
-      { message: "🔍 Processando tipos de pagamento...", type: "info" },
-      {
-        message: "✅ Tipos de pagamento migrados: 12 registros",
-        type: "success",
-      },
-      {
-        message: "📊 Resumo da migração",
-        type: "success",
-        status: { tipoPag: { successCount: 12, errorCount: 0 } },
-      },
-    ],
-  };
+  if (!statusContainer || !statusContent) return;
 
-  return migrationSpecificLogs[type] || migrationSpecificLogs.complete;
+  statusContainer.classList.add("show");
+
+  // Aceita tanto o formato antigo (`totalMigrated`/`errors`) quanto o novo
+  const successCount =
+    typeof summary.successCount === "number"
+      ? summary.successCount
+      : summary.totalMigrated || 0;
+  const errorCount =
+    typeof summary.errorCount === "number"
+      ? summary.errorCount
+      : summary.errors || 0;
+
+  const total = successCount + errorCount;
+  const migrationType = summary.migrationType || summary.type || "-";
+  const ts = summary.timestamp ? new Date(summary.timestamp) : null;
+
+  let html = '<div style="margin-top: 10px;">';
+
+  html += `
+    <div style="padding: 10px; background: #edf2f7; border-radius: 8px; margin-bottom: 10px;">
+      <strong style="color: #2d3748;">Tipo:</strong>
+      <span style="color: #4a5568; font-weight: bold;"> ${migrationType}</span>
+    </div>
+  `;
+
+  html += `
+    <div style="padding: 10px; background: #f7fafc; border-radius: 8px; margin-bottom: 10px;">
+      <strong style="color: #2d3748;">Total (sucesso + erros):</strong>
+      <span style="color: #48bb78; font-weight: bold;"> ${total} registros</span>
+    </div>
+  `;
+
+  html += `
+    <div style="display:flex; gap:10px; margin-bottom:10px;">
+      <div style="padding: 10px; background: #e6fffa; border-radius: 8px; flex:1;">
+        <strong style="color: #2d3748;">Válidos:</strong>
+        <span style="color:#2f855a; font-weight:bold;"> ${successCount}</span>
+      </div>
+      <div style="padding: 10px; background: #fff5f5; border-radius: 8px; flex:1;">
+        <strong style="color: #742a2a;">Erros:</strong>
+        <span style="color:#c53030; font-weight:bold;"> ${errorCount}</span>
+      </div>
+    </div>
+  `;
+
+  if (ts) {
+    html += `
+      <div style="padding: 10px; background: #edf2f8; border-radius: 8px;">
+        <strong style="color: #2d3748;">Timestamp:</strong>
+        <span style="color: #4a5568;"> ${ts.toLocaleString("pt-BR")}</span>
+      </div>
+    `;
+  }
+
+  html += "</div>";
+  statusContent.innerHTML = html;
 }

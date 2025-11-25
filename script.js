@@ -1,4 +1,7 @@
-const API_BASE_URL = "http://localhost:3000/api";
+const API_BASE_URL =
+  window.API_REST ||
+  window.API_BASE_URL + "/api" ||
+  "http://localhost:3000/api";
 
 const loginForm = document.getElementById("loginForm");
 const emailInput = document.getElementById("email");
