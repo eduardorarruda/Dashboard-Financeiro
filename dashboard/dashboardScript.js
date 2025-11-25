@@ -143,7 +143,7 @@ async function loadInitialData() {
     // CORREÇÃO: Mapeamento correto dos dados financeiros.
     financialRecords = recordsData.data.records.map((r) => ({
       id: r.id,
-      type: r.tipo.trim() === "D" ? "pagar" : "receber", // 'D' é Despesa (pagar), 'R' é Receita (receber)
+      type: r.tipo.trim() === "P" ? "pagar" : "receber", // 'D' é Despesa (pagar), 'R' é Receita (receber)
       document: r.numero,
       partner: r.parceiro_nome,
       paymentType: r.idtipopag,
